@@ -9,8 +9,9 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"; // Import Dialog
 import { toast } from "sonner";
-import { Plus, Trash2, ArrowLeft, Zap, Copy, Users, FolderKanban, Trophy, Activity, Clock, CheckCircle } from "lucide-react";
+import { Plus, Trash2, ArrowLeft, Zap, Copy, Users, FolderKanban, Trophy, Activity, Clock, CheckCircle, Eye } from "lucide-react"; // Import Eye
 import { Link } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 
@@ -27,6 +28,10 @@ const Admin = () => {
     // User Management State
     const [teamName, setTeamName] = useState("");
     const [activities, setActivities] = useState<any[]>([]);
+
+    // Submission Viewing State
+    const [viewingUser, setViewingUser] = useState<string | null>(null);
+    const [userSubmissions, setUserSubmissions] = useState<any[]>([]);
 
     useEffect(() => {
         const fetchActivities = async () => {
@@ -46,6 +51,26 @@ const Admin = () => {
         const interval = setInterval(fetchActivities, 10000);
         return () => clearInterval(interval);
     }, []);
+
+    // Fetch submissions when a user is selected
+    useEffect(() => {
+        if (viewingUser) {
+            const fetchSubmissions = async () => {
+                try {
+                    const res = await fetch(`http://localhost:5000/api/submissions/${viewingUser}`);
+                    if (res.ok) {
+                        const data = await res.json();
+                        setUserSubmissions(data);
+                    }
+                } catch (error) {
+                    console.error("Failed to fetch submissions", error);
+                }
+            };
+            fetchSubmissions();
+        } else {
+            setUserSubmissions([]);
+        }
+    }, [viewingUser]);
 
     const selectedTask = tasks.find(t => t.id === selectedTaskId);
 
@@ -315,14 +340,25 @@ const Admin = () => {
                                                                 </div>
                                                             </TableCell>
                                                             <TableCell className="text-right">
-                                                                <Button
-                                                                    variant="ghost"
-                                                                    size="icon"
-                                                                    onClick={() => deleteUser(user.username)}
-                                                                    className="text-destructive hover:bg-destructive/10"
-                                                                >
-                                                                    <Trash2 className="w-4 h-4" />
-                                                                </Button>
+                                                                <div className="flex justify-end gap-2">
+                                                                    <Button
+                                                                        variant="ghost"
+                                                                        size="icon"
+                                                                        onClick={() => setViewingUser(user.username)}
+                                                                        title="View Submissions"
+                                                                    >
+                                                                        <Eye className="w-4 h-4" />
+                                                                    </Button>
+                                                                    <Button
+                                                                        variant="ghost"
+                                                                        size="icon"
+                                                                        onClick={() => deleteUser(user.username)}
+                                                                        className="text-destructive hover:bg-destructive/10"
+                                                                        title="Delete Team"
+                                                                    >
+                                                                        <Trash2 className="w-4 h-4" />
+                                                                    </Button>
+                                                                </div>
                                                             </TableCell>
                                                         </TableRow>
                                                     ))
@@ -356,6 +392,7 @@ const Admin = () => {
                                             <TableHead>Team</TableHead>
                                             <TableHead>Solved</TableHead>
                                             <TableHead className="text-right">Total XP</TableHead>
+                                            <TableHead className="w-[50px]"></TableHead>
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
@@ -366,10 +403,22 @@ const Admin = () => {
                                                     <TableCell className="font-bold text-lg">
                                                         {index === 0 ? "🥇" : index === 1 ? "🥈" : index === 2 ? "🥉" : `#${index + 1}`}
                                                     </TableCell>
-                                                    <TableCell className="font-medium text-lg">{user.username}</TableCell>
+                                                    <TableCell className="font-medium text-lg cursor-pointer hover:underline" onClick={() => setViewingUser(user.username)}>
+                                                        {user.username}
+                                                    </TableCell>
                                                     <TableCell>{user.progress?.length || 0} Tasks</TableCell>
                                                     <TableCell className="text-right font-bold text-primary text-xl">
                                                         {user.xp} XP
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="icon"
+                                                            onClick={() => setViewingUser(user.username)}
+                                                            title="View Solutions"
+                                                        >
+                                                            <Eye className="w-4 h-4 text-muted-foreground" />
+                                                        </Button>
                                                     </TableCell>
                                                 </TableRow>
                                             ))}
@@ -434,6 +483,79 @@ const Admin = () => {
                     </TabsContent>
                 </Tabs>
             </div>
+
+            {/* Submissions Dialog */}
+            <Dialog open={!!viewingUser} onOpenChange={(open) => !open && setViewingUser(null)}>
+                <DialogContent className="max-w-4xl h-[80vh] flex flex-col">
+                    <DialogHeader>
+                        <DialogTitle>Submissions for {viewingUser}</DialogTitle>
+                        <DialogDescription>
+                            Review code and answers submitted across all rounds.
+                        </DialogDescription>
+                    </DialogHeader>
+
+                    <div className="flex-1 overflow-y-auto pr-2 mt-4 space-y-6">
+                        {userSubmissions.length > 0 ? (
+                            tasks.map(task => {
+                                const taskSubmissions = userSubmissions.filter(s => s.taskId === task.id);
+                                if (taskSubmissions.length === 0) return null;
+
+                                return (
+                                    <div key={task.id} className="border rounded-lg p-4 bg-card">
+                                        <h3 className="font-bold text-lg mb-2 flex items-center gap-2">
+                                            {task.title}
+                                            <Badge variant="secondary" className="text-xs">{task.type}</Badge>
+                                        </h3>
+                                        <div className="space-y-4">
+                                            {taskSubmissions.map((sub: any, idx: number) => (
+                                                <div key={idx} className="bg-muted/30 p-3 rounded-md border border-border/50">
+                                                    <div className="flex justify-between items-center mb-2">
+                                                        <span className="text-sm font-medium text-muted-foreground">
+                                                            Question {sub.questionId ? sub.questionId : `#${idx + 1}`}
+                                                        </span>
+                                                        <div className="flex items-center gap-3">
+                                                            {sub.duration && (
+                                                                <span className="text-xs text-primary font-mono bg-primary/10 px-2 py-0.5 rounded">
+                                                                    ⏱️ {Math.floor(sub.duration / 60000)}m {(Math.floor(sub.duration / 1000) % 60)}s
+                                                                </span>
+                                                            )}
+                                                            <span className="text-xs text-muted-foreground">
+                                                                {new Date(sub.timestamp).toLocaleString()}
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                    {sub.language !== 'text' ? (
+                                                        <div className="relative">
+                                                            <Badge variant="outline" className="mb-2">{sub.language}</Badge>
+                                                            <pre className="bg-black/90 text-gray-100 p-3 rounded-md font-mono text-sm overflow-x-auto">
+                                                                <code>{sub.code}</code>
+                                                            </pre>
+                                                        </div>
+                                                    ) : (
+                                                        <div className="bg-secondary/20 p-3 rounded-md italic text-foreground/90 whitespace-pre-wrap">
+                                                            {sub.code}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                );
+                            })
+                        ) : (
+                            <div className="text-center py-12 text-muted-foreground">
+                                No submissions found for this team.
+                            </div>
+                        )}
+                        {/* If user has submissions but they don't map to current tasks (legacy?) */}
+                        {userSubmissions.length > 0 && tasks.every(t => !userSubmissions.some(s => s.taskId === t.id)) && (
+                            <div className="p-4 bg-yellow-500/10 text-yellow-500 rounded border border-yellow-500/20">
+                                Found {userSubmissions.length} submissions but they don't match current round IDs.
+                            </div>
+                        )}
+                    </div>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 };

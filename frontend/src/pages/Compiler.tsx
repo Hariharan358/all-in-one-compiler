@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Code2, Zap, RotateCcw, ArrowLeft, CheckCircle2, AlertTriangle, FileText, ChevronLeft, ChevronRight, Maximize, Minimize } from "lucide-react";
+import { Code2, Zap, RotateCcw, ArrowLeft, CheckCircle2, AlertTriangle, FileText, ChevronLeft, ChevronRight, Maximize, Minimize, Clock } from "lucide-react";
 import { LanguageSelector, Language, languages } from "@/components/LanguageSelector";
 import { CodeEditor } from "@/components/CodeEditor";
 import { OutputPanel } from "@/components/OutputPanel";
@@ -16,7 +16,7 @@ import { useTasks } from "@/context/TaskContext";
 const Compiler = () => {
     const [searchParams] = useSearchParams();
     const taskId = searchParams.get("task");
-    const { user, updateProgress } = useAuth();
+    const { user, updateProgress, submitTask } = useAuth();
     const navigate = useNavigate();
     const { tasks } = useTasks();
 
@@ -93,10 +93,48 @@ const Compiler = () => {
         }
     };
 
+    // Timer State
+    const [startTime, setStartTime] = useState<number | null>(null);
+    const [elapsedTime, setElapsedTime] = useState(0);
+
+    // Initial load check for timer
+    useEffect(() => {
+        if (taskId) {
+            const savedStart = localStorage.getItem(`startTime_${taskId}`);
+            if (savedStart) {
+                setStartTime(Number(savedStart));
+                setIsTaskStarted(true);
+            }
+        }
+    }, [taskId]);
+
+    // Timer Interval
+    useEffect(() => {
+        let interval: NodeJS.Timeout;
+        if (isTaskStarted && startTime) {
+            interval = setInterval(() => {
+                setElapsedTime(Math.floor((Date.now() - startTime) / 1000));
+            }, 1000);
+        }
+        return () => clearInterval(interval);
+    }, [isTaskStarted, startTime]);
+
+    // Format timer
+    const formatTime = (seconds: number) => {
+        const mins = Math.floor(seconds / 60);
+        const secs = seconds % 60;
+        return `${mins}:${secs.toString().padStart(2, '0')}`;
+    };
+
+    // ... existing logic ...
+
     const handleStartTask = () => {
         toggleFullScreen();
         setIsTaskStarted(true);
-        toast.success("Round Started! Fullscreen mode enabled.");
+        const now = Date.now();
+        setStartTime(now);
+        localStorage.setItem(`startTime_${taskId}`, now.toString());
+        toast.success("Round Started! Timer running. Fullscreen mode enabled.");
     };
 
     const handleRun = () => {
@@ -104,7 +142,7 @@ const Compiler = () => {
         executeCode(code, language);
     };
 
-    const handleSubmit = () => {
+    const handleSubmit = async () => {
         if (!taskId) return;
 
         if (isTextTask) {
@@ -120,6 +158,21 @@ const Compiler = () => {
             }
         }
 
+        // Timer Calculation
+        const duration = startTime ? Date.now() - startTime : 0;
+
+        // Submit to Backend
+        if (currentTask) {
+            await submitTask({
+                taskId: currentTask.id,
+                questionId: currentQuestion?.id,
+                code: code,
+                language: isTextTask ? 'text' : language,
+                status: 'Submitted',
+                duration: duration
+            });
+        }
+
         toast.success(`Question ${currentQuestionIndex + 1} Submitted!`);
 
         // Move to next question if available
@@ -128,6 +181,10 @@ const Compiler = () => {
         } else {
             // Round Complete
             updateProgress(Number(taskId), currentTask?.points || 10);
+
+            // Clear Timer
+            localStorage.removeItem(`startTime_${taskId}`);
+
             toast.success("Round Completed! 🎉");
             setTimeout(() => navigate("/"), 1500);
         }
@@ -200,26 +257,33 @@ const Compiler = () => {
                         </div>
 
                         {/* Center: Navigation */}
-                        <div className="flex items-center gap-2 bg-secondary/20 p-1 rounded-lg">
-                            <Button
-                                variant="ghost"
-                                size="sm"
-                                disabled={currentQuestionIndex === 0}
-                                onClick={() => setCurrentQuestionIndex(prev => prev - 1)}
-                            >
-                                <ChevronLeft className="w-4 h-4" />
-                            </Button>
-                            <span className="text-sm font-medium px-2">
-                                {currentQuestionIndex + 1} / {questions.length}
-                            </span>
-                            <Button
-                                variant="ghost"
-                                size="sm"
-                                disabled={currentQuestionIndex === questions.length - 1}
-                                onClick={() => setCurrentQuestionIndex(prev => prev + 1)}
-                            >
-                                <ChevronRight className="w-4 h-4" />
-                            </Button>
+                        <div className="flex items-center gap-4">
+                            <div className="flex items-center gap-2 bg-secondary/20 p-1 px-3 rounded-lg font-mono text-sm text-primary border border-primary/20">
+                                <Clock className="w-4 h-4" />
+                                {formatTime(elapsedTime)}
+                            </div>
+
+                            <div className="flex items-center gap-2 bg-secondary/20 p-1 rounded-lg">
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    disabled={currentQuestionIndex === 0}
+                                    onClick={() => setCurrentQuestionIndex(prev => prev - 1)}
+                                >
+                                    <ChevronLeft className="w-4 h-4" />
+                                </Button>
+                                <span className="text-sm font-medium px-2">
+                                    {currentQuestionIndex + 1} / {questions.length}
+                                </span>
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    disabled={currentQuestionIndex === questions.length - 1}
+                                    onClick={() => setCurrentQuestionIndex(prev => prev + 1)}
+                                >
+                                    <ChevronRight className="w-4 h-4" />
+                                </Button>
+                            </div>
                         </div>
 
                         {/* Right: Actions */}

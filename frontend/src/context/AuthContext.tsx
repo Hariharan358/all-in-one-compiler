@@ -24,6 +24,7 @@ interface AuthContextType {
     login: (username: string, password?: string) => Promise<void>;
     logout: () => void;
     updateProgress: (taskId: number, xp: number) => void;
+    submitTask: (submission: { taskId: number, questionId?: string, code: string, language?: string, status?: string, duration?: number }) => Promise<void>;
     isAuthenticated: boolean;
     // Admin features
     registeredUsers: RegisteredUser[];
@@ -186,12 +187,29 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         }
     };
 
+    const submitTask = async (submission: { taskId: number, questionId?: string, code: string, language?: string, status?: string, duration?: number }) => {
+        if (!user) return;
+        try {
+            await fetch(`${API_URL}/api/submissions`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    username: user.username,
+                    ...submission
+                })
+            });
+        } catch (error) {
+            console.error("Failed to submit task", error);
+        }
+    };
+
     return (
         <AuthContext.Provider value={{
             user,
             login,
             logout,
             updateProgress,
+            submitTask, // Export this
             isAuthenticated: !!user,
             registeredUsers,
             registerUser,
