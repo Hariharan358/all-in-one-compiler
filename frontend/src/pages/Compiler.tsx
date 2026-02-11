@@ -1,11 +1,12 @@
 import { useState, useEffect } from "react";
-import { Code2, Zap, RotateCcw, ArrowLeft, CheckCircle2, AlertTriangle, FileText, ChevronLeft, ChevronRight, Maximize, Minimize, Clock } from "lucide-react";
+import { Code2, Zap, RotateCcw, ArrowLeft, ArrowRight, CheckCircle2, AlertTriangle, FileText, ChevronLeft, ChevronRight, Maximize, Minimize, Clock } from "lucide-react";
 import { LanguageSelector, Language, languages } from "@/components/LanguageSelector";
 import { CodeEditor } from "@/components/CodeEditor";
 import { OutputPanel } from "@/components/OutputPanel";
 import { RunButton } from "@/components/RunButton";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { codeTemplates } from "@/lib/codeTemplates";
 import { useCodeExecution } from "@/hooks/useCodeExecution";
 import { Toaster, toast } from "sonner";
@@ -173,11 +174,50 @@ const Compiler = () => {
 
     const isTextTask = currentTask?.type === 'riddle' || currentTask?.type === 'case-study';
 
+    // NEW: Language Selection for Round 2
+    const [selectionLanguage, setSelectionLanguage] = useState<string>("");
+    const { refreshTasks } = useTasks();
+
+    const handleLanguageSelection = async () => {
+        if (!selectionLanguage) {
+            toast.error("Please select a language first");
+            return;
+        }
+
+        try {
+            const res = await fetch('http://localhost:5000/api/allocate-question', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    username: user?.username,
+                    taskId: Number(taskId),
+                    language: selectionLanguage
+                })
+            });
+
+            if (!res.ok) {
+                const err = await res.json();
+                throw new Error(err.error || "Failed to allocate question");
+            }
+
+            toast.success(`Language selected! Loading your ${selectionLanguage} challenge...`);
+            await refreshTasks();
+
+        } catch (err: any) {
+            toast.error(err.message);
+        }
+    };
+
+
     useEffect(() => {
         if (!taskId) {
             setIsTaskStarted(true);
         }
     }, [taskId]);
+
+    // ... (keep existing effects)
+
+    // ... rest of existing code
 
     // Track fullscreen changes
     useEffect(() => {
@@ -384,6 +424,52 @@ const Compiler = () => {
 
     const currentLang = languages.find((l) => l.id === language);
 
+    // Language Selection Screen for Task 2 (if no questions allocated yet)
+    if (taskId && currentTask?.id === 2 && questions.length === 0) {
+        return (
+            <div className="min-h-screen bg-background flex flex-col items-center justify-center p-4">
+                <Toaster position="top-right" theme="dark" />
+                <div className="max-w-md w-full bg-card border border-border rounded-xl p-8 shadow-2xl text-center space-y-6 animate-in fade-in zoom-in duration-300">
+                    <div className="mx-auto w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mb-4">
+                        <Code2 className="w-8 h-8 text-primary" />
+                    </div>
+                    <h1 className="text-3xl font-bold text-foreground">
+                        Select Your Language
+                    </h1>
+                    <p className="text-muted-foreground">
+                        For this debugging round, please select your preferred programming language.
+                    </p>
+
+                    <div className="grid grid-cols-1 gap-3">
+                        {['Python', 'Java', 'C'].map((lang) => (
+                            <Button
+                                key={lang}
+                                variant={selectionLanguage === lang ? "default" : "outline"}
+                                className={`h-12 text-lg justify-start px-6 ${selectionLanguage === lang ? 'border-primary ring-2 ring-primary ring-offset-2 ring-offset-background' : ''}`}
+                                onClick={() => setSelectionLanguage(lang)}
+                            >
+                                <span className={`w-3 h-3 rounded-full mr-3 ${lang === 'Python' ? 'bg-yellow-400' :
+                                    lang === 'Java' ? 'bg-red-500' :
+                                        'bg-blue-500'
+                                    }`}></span>
+                                {lang}
+                            </Button>
+                        ))}
+                    </div>
+
+                    <Button
+                        onClick={handleLanguageSelection}
+                        size="lg"
+                        className="w-full font-semibold text-lg h-12 shadow-lg shadow-primary/20 mt-6"
+                        disabled={!selectionLanguage}
+                    >
+                        Confirm Selection <ArrowRight className="ml-2 w-4 h-4" />
+                    </Button>
+                </div>
+            </div>
+        );
+    }
+
     if (taskId && !isTaskStarted) {
         return (
             <div className="min-h-screen bg-background flex flex-col items-center justify-center p-4">
@@ -504,73 +590,123 @@ const Compiler = () => {
 
             {/* Main Content */}
             <main className="flex-1 container mx-auto px-4 py-6">
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 h-[calc(100vh-180px)]">
-                    {/* Editor / Input Panel */}
-                    <div className="flex flex-col animate-slide-up">
-                        <div className="flex items-center justify-between mb-3">
-                            <div className="flex items-center gap-2">
-                                <span className="text-sm font-medium text-foreground">
-                                    {isTextTask ? "Your Answer" : "Editor"}
-                                </span>
-                                {!isTextTask && (
-                                    <span className="px-2 py-0.5 rounded-full bg-secondary text-xs text-muted-foreground">
-                                        {currentLang?.icon} {currentLang?.name} {currentLang?.version}
+                {currentQuestion?.externalUrl ? (
+                    <div className="flex flex-col items-center justify-center h-[calc(100vh-200px)] animate-in fade-in zoom-in duration-300">
+                        <Card className="w-full max-w-2xl bg-card border-border shadow-2xl">
+                            <CardHeader className="text-center">
+                                <div className="mx-auto w-20 h-20 bg-primary/10 rounded-full flex items-center justify-center mb-4">
+                                    <Zap className="w-10 h-10 text-primary" />
+                                </div>
+                                <CardTitle className="text-3xl font-bold">External Challenge</CardTitle>
+                                <CardDescription className="text-lg mt-2">
+                                    You have been assigned a challenge on HackerRank.
+                                </CardDescription>
+                            </CardHeader>
+                            <CardContent className="space-y-6 text-center">
+                                <div className="bg-secondary/30 p-6 rounded-xl border border-border/50">
+                                    <p className="text-muted-foreground mb-2">Your Assigned Challenge ID</p>
+                                    <code className="text-2xl font-bold font-mono text-primary bg-primary/10 px-4 py-2 rounded-lg">
+                                        {currentQuestion.id}
+                                    </code>
+                                </div>
+
+                                <div className="space-y-4">
+                                    <p className="text-muted-foreground">
+                                        Click the button below to open your challenge in a new tab.
+                                        <br />Once you have submitted your solution there, click "Submit Round" here.
+                                    </p>
+
+                                    <Button
+                                        size="lg"
+                                        className="w-full h-14 text-lg gap-2"
+                                        onClick={() => window.open(currentQuestion.externalUrl, '_blank')}
+                                    >
+                                        Open HackerRank Challenge <ArrowRight className="w-5 h-5" />
+                                    </Button>
+
+                                    <div className="pt-4 border-t border-border">
+                                        <Button
+                                            variant="secondary"
+                                            onClick={handleSubmit}
+                                            className="w-full"
+                                        >
+                                            <CheckCircle2 className="w-4 h-4 mr-2" />
+                                            I have completed the challenge
+                                        </Button>
+                                    </div>
+                                </div>
+                            </CardContent>
+                        </Card>
+                    </div>
+                ) : (
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 h-[calc(100vh-180px)]">
+                        {/* Editor / Input Panel */}
+                        <div className="flex flex-col animate-slide-up">
+                            <div className="flex items-center justify-between mb-3">
+                                <div className="flex items-center gap-2">
+                                    <span className="text-sm font-medium text-foreground">
+                                        {isTextTask ? "Your Answer" : "Editor"}
                                     </span>
+                                    {!isTextTask && (
+                                        <span className="px-2 py-0.5 rounded-full bg-secondary text-xs text-muted-foreground">
+                                            {currentLang?.icon} {currentLang?.name} {currentLang?.version}
+                                        </span>
+                                    )}
+                                </div>
+                            </div>
+                            <div className="flex-1 min-h-0">
+                                {isTextTask ? (
+                                    <Textarea
+                                        value={code}
+                                        onChange={(e) => setCode(e.target.value)}
+                                        className="h-full resize-none font-mono text-base p-4 bg-card border-border focus:ring-primary"
+                                        placeholder={currentTask?.type === 'riddle' ? "Type your answer..." : "Write your pitch..."}
+                                    />
+                                ) : (
+                                    <CodeEditor code={code} onChange={setCode} language={language} />
                                 )}
                             </div>
                         </div>
-                        <div className="flex-1 min-h-0">
-                            {isTextTask ? (
-                                <Textarea
-                                    value={code}
-                                    onChange={(e) => setCode(e.target.value)}
-                                    className="h-full resize-none font-mono text-base p-4 bg-card border-border focus:ring-primary"
-                                    placeholder={currentTask?.type === 'riddle' ? "Type your answer..." : "Write your pitch..."}
-                                />
+
+                        {/* Question / Output Panel */}
+                        <div className="flex flex-col animate-slide-up" style={{ animationDelay: "0.1s" }}>
+                            {/* Split View for non-text tasks: Description TOP, Output BOTTOM */}
+                            {!isTextTask ? (
+                                <div className="flex flex-col h-full gap-4">
+                                    <div className="flex-[0.4] bg-card border border-border rounded-md p-4 overflow-y-auto">
+                                        <h3 className="text-sm font-bold text-muted-foreground mb-2 sm:mb-0">Problem Statement</h3>
+                                        <p className="text-base whitespace-pre-wrap">{currentQuestion?.content}</p>
+                                    </div>
+                                    <div className="flex-[0.6] flex flex-col min-h-0">
+                                        <div className="mb-2">
+                                            <span className="text-sm font-medium text-foreground">Console</span>
+                                        </div>
+                                        <div className="flex-1 min-h-0 editor-container overflow-hidden">
+                                            <OutputPanel
+                                                output={result.output}
+                                                error={result.error}
+                                                isLoading={isLoading}
+                                                executionTime={result.executionTime}
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
                             ) : (
-                                <CodeEditor code={code} onChange={setCode} language={language} />
+                                <div className="flex flex-col h-full">
+                                    <div className="mb-3">
+                                        <span className="text-sm font-medium text-foreground">Question</span>
+                                    </div>
+                                    <div className="flex-1 bg-card border border-border rounded-md p-6 overflow-y-auto">
+                                        <h3 className="text-xl font-bold mb-4">{currentTask?.title}</h3>
+                                        <div className="prose prose-invert max-w-none">
+                                            <p className="text-lg leading-relaxed whitespace-pre-wrap">{currentQuestion?.content}</p>
+                                        </div>
+                                    </div>
+                                </div>
                             )}
                         </div>
                     </div>
-
-                    {/* Question / Output Panel */}
-                    <div className="flex flex-col animate-slide-up" style={{ animationDelay: "0.1s" }}>
-                        {/* Split View for non-text tasks: Description TOP, Output BOTTOM */}
-                        {!isTextTask ? (
-                            <div className="flex flex-col h-full gap-4">
-                                <div className="flex-[0.4] bg-card border border-border rounded-md p-4 overflow-y-auto">
-                                    <h3 className="text-sm font-bold text-muted-foreground mb-2 sm:mb-0">Problem Statement</h3>
-                                    <p className="text-base whitespace-pre-wrap">{currentQuestion?.content}</p>
-                                </div>
-                                <div className="flex-[0.6] flex flex-col min-h-0">
-                                    <div className="mb-2">
-                                        <span className="text-sm font-medium text-foreground">Console</span>
-                                    </div>
-                                    <div className="flex-1 min-h-0 editor-container overflow-hidden">
-                                        <OutputPanel
-                                            output={result.output}
-                                            error={result.error}
-                                            isLoading={isLoading}
-                                            executionTime={result.executionTime}
-                                        />
-                                    </div>
-                                </div>
-                            </div>
-                        ) : (
-                            <div className="flex flex-col h-full">
-                                <div className="mb-3">
-                                    <span className="text-sm font-medium text-foreground">Question</span>
-                                </div>
-                                <div className="flex-1 bg-card border border-border rounded-md p-6 overflow-y-auto">
-                                    <h3 className="text-xl font-bold mb-4">{currentTask?.title}</h3>
-                                    <div className="prose prose-invert max-w-none">
-                                        <p className="text-lg leading-relaxed whitespace-pre-wrap">{currentQuestion?.content}</p>
-                                    </div>
-                                </div>
-                            </div>
-                        )}
-                    </div>
-                </div>
+                )}
             </main>
         </div>
     );
