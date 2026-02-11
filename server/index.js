@@ -95,7 +95,7 @@ const sendCredentialsEmail = async (email, username, password) => {
                     </p>
                     
                     <div style="text-align: center; margin: 30px 0;">
-                        <a href="http://localhost:5000/login" style="background-color: #007bff; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; font-weight: bold;">Login to Platform</a>
+                        <a href="https://techception-titanium.vercel.app/" style="background-color: #007bff; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; font-weight: bold;">Login to Platform</a>
                     </div>
                     
                     <p style="color: #999; font-size: 14px; text-align: center; margin-top: 30px;">
