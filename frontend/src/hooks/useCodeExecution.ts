@@ -29,7 +29,8 @@ export function useCodeExecution() {
     try {
       const config = languageConfig[language];
 
-      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/compile`, {
+      const baseUrl = (import.meta.env.VITE_API_BASE_URL || "http://localhost:5000").replace(/\/$/, "");
+      const response = await fetch(`${baseUrl}/compile`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

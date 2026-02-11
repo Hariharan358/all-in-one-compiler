@@ -123,12 +123,15 @@ export const TaskProvider = ({ children }: { children: ReactNode }) => {
     const { user } = useAuth();
     const [tasks, setTasks] = useState<Task[]>([]);
 
+    // Sanitize API URL
+    const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || "http://localhost:5000").replace(/\/$/, "");
+
     const fetchTasks = async () => {
         try {
             // Use user-specific endpoint if user is logged in, otherwise use general endpoint
             const endpoint = user?.username
-                ? `${import.meta.env.VITE_API_BASE_URL}/api/tasks/user/${encodeURIComponent(user.username)}`
-                : `${import.meta.env.VITE_API_BASE_URL}/api/tasks`;
+                ? `${API_BASE_URL}/api/tasks/user/${encodeURIComponent(user.username)}`
+                : `${API_BASE_URL}/api/tasks`;
 
             console.log('Fetching tasks from:', endpoint);
 
@@ -145,7 +148,7 @@ export const TaskProvider = ({ children }: { children: ReactNode }) => {
                 const seededTasks = [];
                 for (const task of defaultTasks) {
                     try {
-                        const seedRes = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/tasks`, {
+                        const seedRes = await fetch(`${API_BASE_URL}/api/tasks`, {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({
@@ -182,7 +185,7 @@ export const TaskProvider = ({ children }: { children: ReactNode }) => {
 
     const addTask = async (newTask: Omit<Task, "id">) => {
         try {
-            const res = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/tasks`, {
+            const res = await fetch(`${API_BASE_URL}/api/tasks`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(newTask)
@@ -198,7 +201,7 @@ export const TaskProvider = ({ children }: { children: ReactNode }) => {
 
     const deleteTask = async (id: number) => {
         try {
-            await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/tasks/${id}`, {
+            await fetch(`${API_BASE_URL}/api/tasks/${id}`, {
                 method: 'DELETE'
             });
             setTasks(prev => prev.filter(t => t.id !== id));
@@ -209,7 +212,7 @@ export const TaskProvider = ({ children }: { children: ReactNode }) => {
 
     const addQuestion = async (taskId: number, question: Omit<Question, "id">) => {
         try {
-            const res = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/tasks/${taskId}/questions`, {
+            const res = await fetch(`${API_BASE_URL}/api/tasks/${taskId}/questions`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(question)
@@ -225,7 +228,7 @@ export const TaskProvider = ({ children }: { children: ReactNode }) => {
 
     const deleteQuestion = async (taskId: number, questionId: string) => {
         try {
-            const res = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/tasks/${taskId}/questions/${questionId}`, {
+            const res = await fetch(`${API_BASE_URL}/api/tasks/${taskId}/questions/${questionId}`, {
                 method: 'DELETE'
             });
             if (res.ok) {
