@@ -120,7 +120,7 @@ const defaultTasks: Task[] = [
 ];
 
 export const TaskProvider = ({ children }: { children: ReactNode }) => {
-    const { user } = useAuth();
+    const { user, isAdmin } = useAuth();
     const [tasks, setTasks] = useState<Task[]>([]);
 
     // Sanitize API URL
@@ -128,8 +128,8 @@ export const TaskProvider = ({ children }: { children: ReactNode }) => {
 
     const fetchTasks = async () => {
         try {
-            // Use user-specific endpoint if user is logged in, otherwise use general endpoint
-            const endpoint = user?.username
+            // Use user-specific endpoint if user is logged in AND not admin, otherwise use general endpoint
+            const endpoint = (user?.username && !isAdmin)
                 ? `${API_BASE_URL}/api/tasks/user/${encodeURIComponent(user.username)}`
                 : `${API_BASE_URL}/api/tasks`;
 
@@ -181,7 +181,7 @@ export const TaskProvider = ({ children }: { children: ReactNode }) => {
 
     useEffect(() => {
         fetchTasks();
-    }, [user?.username]); // Re-fetch when user changes
+    }, [user?.username, isAdmin]); // Re-fetch when user changes
 
     const addTask = async (newTask: Omit<Task, "id">) => {
         try {
