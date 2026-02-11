@@ -1,8 +1,6 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
-const { exec } = require('child_process');
-const fs = require('fs');
 const path = require('path');
 const { v4: uuidv4 } = require('uuid');
 const mongoose = require('mongoose');
@@ -30,7 +28,7 @@ const limiter = rateLimit({
 app.use(limiter);
 
 const PORT = 5000;
-const TEMP_DIR = path.join(__dirname, 'temp');
+
 
 // --- Database Connection ---
 const MONGO_URI = process.env.MONGO_URI || 'mongodb://localhost:27017/compiler_app';
@@ -600,99 +598,7 @@ app.post('/api/admin/award-xp', async (req, res) => {
 });
 
 
-// --- Compiler Logic ---
 
-// Ensure temp directory exists
-if (!fs.existsSync(TEMP_DIR)) {
-    fs.mkdirSync(TEMP_DIR);
-}
-
-// Map languages to file extensions and docker commands
-const LANGUAGE_CONFIG = {
-    c: {
-        extension: 'c',
-        runCommand: (file) => `gcc ${file} -o /code/output && /code/output`
-    },
-    cpp: {
-        extension: 'cpp',
-        runCommand: (file) => `g++ ${file} -o /code/output && /code/output`
-    },
-    python: {
-        extension: 'py',
-        runCommand: (file) => `python3 ${file}`
-    },
-    java: {
-        extension: 'java',
-        runCommand: (file) => `javac ${file} && java -cp /code Main`
-    }
-};
-
-app.post('/compile', async (req, res) => {
-    const { language, code, input } = req.body;
-
-    if (!code || !language) {
-        return res.status(400).json({ error: 'Code and language are required' });
-    }
-
-    const config = LANGUAGE_CONFIG[language.toLowerCase()];
-    if (!config) {
-        return res.status(400).json({ error: 'Unsupported language' });
-    }
-
-    const jobId = uuidv4();
-    const filename = language.toLowerCase() === 'java' ? 'Main.java' : `${jobId}.${config.extension}`;
-    const jobDir = path.join(TEMP_DIR, jobId);
-
-    if (!fs.existsSync(jobDir)) {
-        fs.mkdirSync(jobDir);
-    }
-
-    const filePath = path.join(jobDir, filename);
-
-    try {
-        await fs.promises.writeFile(filePath, code);
-
-        const inputPath = path.join(jobDir, 'input.txt');
-        if (input) {
-            await fs.promises.writeFile(inputPath, input);
-        }
-
-        const absoluteJobDir = jobDir; // In Docker environment this might need adjustment depending on host OS
-
-        let command = `docker run --rm --network none --memory 128m -v "${absoluteJobDir}:/code" compiler-sandbox sh -c "${config.runCommand(filename)}"`;
-
-        if (input) {
-            command = `docker run --rm --network none --memory 128m -v "${absoluteJobDir}:/code" compiler-sandbox sh -c "${config.runCommand(filename)} < input.txt"`;
-        }
-
-        console.log(`Executing: ${command}`);
-
-        exec(command, { timeout: 10000 }, (error, stdout, stderr) => {
-            try {
-                fs.rmSync(jobDir, { recursive: true, force: true });
-            } catch (cleanupErr) {
-                console.error('Cleanup error:', cleanupErr);
-            }
-
-            if (error && error.killed) {
-                return res.json({ output: '', error: 'Time Limit Exceeded' });
-            }
-
-            if (error) {
-                return res.json({ output: stdout, error: stderr || error.message });
-            }
-
-            res.json({ output: stdout, error: stderr });
-        });
-
-    } catch (err) {
-        console.error('Server error:', err);
-        if (fs.existsSync(jobDir)) {
-            fs.rmSync(jobDir, { recursive: true, force: true });
-        }
-        res.status(500).json({ error: 'Internal server error' });
-    }
-});
 
 
 // --- Submission Model ---

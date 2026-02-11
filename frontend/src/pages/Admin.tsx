@@ -49,6 +49,7 @@ const Admin = () => {
     const [activities, setActivities] = useState<any[]>([]);
     const [allSubmissions, setAllSubmissions] = useState<any[]>([]);
     const [leaderboardUsers, setLeaderboardUsers] = useState<any[]>([]);
+    const [questionOrders, setQuestionOrders] = useState<any[]>([]);
     const [xpAward, setXpAward] = useState("");
 
     // Fetch activities, submissions, and leaderboard data
@@ -89,16 +90,30 @@ const Admin = () => {
             }
         };
 
+        const fetchQuestionOrders = async () => {
+            try {
+                const res = await fetch('http://localhost:5000/api/question-orders');
+                if (res.ok) {
+                    const data = await res.json();
+                    setQuestionOrders(data);
+                }
+            } catch (error) {
+                console.error("Failed to fetch question orders", error);
+            }
+        };
+
         // Initial fetch
         fetchActivities();
         fetchAllSubmissions();
         fetchLeaderboard();
+        fetchQuestionOrders();
 
         // Poll for updates every 5 seconds for real-time leaderboard
         const interval = setInterval(() => {
             fetchActivities();
             fetchAllSubmissions();
             fetchLeaderboard();
+            fetchQuestionOrders();
         }, 5000);
 
         return () => clearInterval(interval);
@@ -226,7 +241,7 @@ const Admin = () => {
                 </div>
 
                 <Tabs defaultValue="rounds" className="space-y-6">
-                    <TabsList className="grid w-full grid-cols-5 max-w-[1000px]">
+                    <TabsList className="grid w-full grid-cols-6 max-w-[1000px]">
                         <TabsTrigger value="rounds" className="flex items-center gap-2">
                             <FolderKanban className="w-4 h-4" /> Rounds
                         </TabsTrigger>
@@ -241,6 +256,9 @@ const Admin = () => {
                         </TabsTrigger>
                         <TabsTrigger value="activity" className="flex items-center gap-2">
                             <Activity className="w-4 h-4" /> Activity Log
+                        </TabsTrigger>
+                        <TabsTrigger value="allocations" className="flex items-center gap-2">
+                            <FileText className="w-4 h-4" /> Allocations
                         </TabsTrigger>
                     </TabsList>
 
@@ -748,6 +766,61 @@ const Admin = () => {
                                         </div>
                                     )}
                                 </div>
+                            </CardContent>
+                        </Card>
+                    </TabsContent>
+
+
+                    {/* ALLOCATIONS TAB */}
+                    <TabsContent value="allocations" className="space-y-8">
+                        <Card>
+                            <CardHeader>
+                                <CardTitle>Problem Allocations</CardTitle>
+                                <CardDescription>View which problems have been assigned to each team per round.</CardDescription>
+                            </CardHeader>
+                            <CardContent>
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow>
+                                            <TableHead>Team Name</TableHead>
+                                            <TableHead>Round (Task)</TableHead>
+                                            <TableHead>Assigned Question ID</TableHead>
+                                            <TableHead>Allocated At</TableHead>
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {questionOrders.length > 0 ? (
+                                            questionOrders.map((order) => (
+                                                <TableRow key={order._id}>
+                                                    <TableCell className="font-medium">{order.username}</TableCell>
+                                                    <TableCell>
+                                                        <Badge variant="outline">
+                                                            {tasks.find(t => t.id === order.taskId)?.title || `Task ${order.taskId}`}
+                                                        </Badge>
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        {order.questionOrder && order.questionOrder.length > 0 ? (
+                                                            <code className="bg-muted px-2 py-1 rounded font-mono text-sm">
+                                                                {order.questionOrder[0]}
+                                                            </code>
+                                                        ) : (
+                                                            <span className="text-muted-foreground italic">None</span>
+                                                        )}
+                                                    </TableCell>
+                                                    <TableCell className="text-muted-foreground text-sm">
+                                                        {new Date(order.createdAt).toLocaleString()}
+                                                    </TableCell>
+                                                </TableRow>
+                                            ))
+                                        ) : (
+                                            <TableRow>
+                                                <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
+                                                    No allocations found yet.
+                                                </TableCell>
+                                            </TableRow>
+                                        )}
+                                    </TableBody>
+                                </Table>
                             </CardContent>
                         </Card>
                     </TabsContent>

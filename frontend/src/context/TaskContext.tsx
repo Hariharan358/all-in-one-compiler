@@ -12,6 +12,7 @@ export interface Question {
     codeSnippet?: string; // The buggy code or starter template
     sampleInput?: string;
     sampleOutput?: string;
+    externalUrl?: string;
 }
 
 export interface Task {
@@ -30,6 +31,7 @@ interface TaskContextType {
     deleteTask: (id: number) => void;
     addQuestion: (taskId: number, question: Omit<Question, "id">) => void;
     deleteQuestion: (taskId: number, questionId: string) => void;
+    refreshTasks: () => Promise<void>;
 }
 
 const TaskContext = createContext<TaskContextType | undefined>(undefined);
@@ -121,60 +123,60 @@ export const TaskProvider = ({ children }: { children: ReactNode }) => {
     const { user } = useAuth();
     const [tasks, setTasks] = useState<Task[]>([]);
 
-    useEffect(() => {
-        const fetchTasks = async () => {
-            try {
-                // Use user-specific endpoint if user is logged in, otherwise use general endpoint
-                const endpoint = user?.username
-                    ? `http://localhost:5000/api/tasks/user/${encodeURIComponent(user.username)}`
-                    : 'http://localhost:5000/api/tasks';
+    const fetchTasks = async () => {
+        try {
+            // Use user-specific endpoint if user is logged in, otherwise use general endpoint
+            const endpoint = user?.username
+                ? `http://localhost:5000/api/tasks/user/${encodeURIComponent(user.username)}`
+                : 'http://localhost:5000/api/tasks';
 
-                console.log('Fetching tasks from:', endpoint);
+            console.log('Fetching tasks from:', endpoint);
 
-                const res = await fetch(endpoint);
-                if (!res.ok) throw new Error("Failed to fetch");
-                const data = await res.json();
+            const res = await fetch(endpoint);
+            if (!res.ok) throw new Error("Failed to fetch");
+            const data = await res.json();
 
-                if (Array.isArray(data) && data.length > 0) {
-                    console.log(`Loaded ${data.length} tasks${user?.username ? ' with shuffled questions for ' + user.username : ''}`);
-                    setTasks(data);
-                } else {
-                    console.log("No tasks found, seeding defaults...");
-                    // Seed data if empty
-                    const seededTasks = [];
-                    for (const task of defaultTasks) {
-                        try {
-                            const seedRes = await fetch('http://localhost:5000/api/tasks', {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({
-                                    title: task.title,
-                                    description: task.description,
-                                    difficulty: task.difficulty,
-                                    points: task.points,
-                                    type: task.type,
-                                    questions: task.questions
-                                })
-                            });
-                            if (seedRes.ok) {
-                                seededTasks.push(await seedRes.json());
-                            }
-                        } catch (e) {
-                            console.error("Error seeding task:", task.title, e);
+            if (Array.isArray(data) && data.length > 0) {
+                console.log(`Loaded ${data.length} tasks${user?.username ? ' with shuffled questions for ' + user.username : ''}`);
+                setTasks(data);
+            } else {
+                console.log("No tasks found, seeding defaults...");
+                // Seed data if empty
+                const seededTasks = [];
+                for (const task of defaultTasks) {
+                    try {
+                        const seedRes = await fetch('http://localhost:5000/api/tasks', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                title: task.title,
+                                description: task.description,
+                                difficulty: task.difficulty,
+                                points: task.points,
+                                type: task.type,
+                                questions: task.questions
+                            })
+                        });
+                        if (seedRes.ok) {
+                            seededTasks.push(await seedRes.json());
                         }
-                    }
-                    if (seededTasks.length > 0) {
-                        setTasks(seededTasks);
-                    } else {
-                        setTasks(defaultTasks);
+                    } catch (e) {
+                        console.error("Error seeding task:", task.title, e);
                     }
                 }
-            } catch (err) {
-                console.error("Failed to fetch tasks:", err);
-                setTasks(defaultTasks);
+                if (seededTasks.length > 0) {
+                    setTasks(seededTasks);
+                } else {
+                    setTasks(defaultTasks);
+                }
             }
-        };
+        } catch (err) {
+            console.error("Failed to fetch tasks:", err);
+            setTasks(defaultTasks);
+        }
+    };
 
+    useEffect(() => {
         fetchTasks();
     }, [user?.username]); // Re-fetch when user changes
 
@@ -236,7 +238,7 @@ export const TaskProvider = ({ children }: { children: ReactNode }) => {
     };
 
     return (
-        <TaskContext.Provider value={{ tasks, addTask, deleteTask, addQuestion, deleteQuestion }}>
+        <TaskContext.Provider value={{ tasks, addTask, deleteTask, addQuestion, deleteQuestion, refreshTasks: fetchTasks }}>
             {children}
         </TaskContext.Provider>
     );
