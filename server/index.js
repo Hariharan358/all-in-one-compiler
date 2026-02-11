@@ -1,10 +1,17 @@
-require('dotenv').config();
-const express = require('express');
-const cors = require('cors');
-const path = require('path');
-const { v4: uuidv4 } = require('uuid');
-const mongoose = require('mongoose');
-const nodemailer = require('nodemailer');
+import dotenv from 'dotenv';
+import express from 'express';
+import cors from 'cors';
+import path from 'path';
+import { v4 as uuidv4 } from 'uuid';
+import mongoose from 'mongoose';
+import nodemailer from 'nodemailer';
+import { fileURLToPath } from 'url';
+import rateLimit from 'express-rate-limit';
+
+dotenv.config();
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const app = express();
 app.use(express.json());
@@ -17,7 +24,7 @@ app.use((req, res, next) => {
 });
 
 // Rate Limiting
-const rateLimit = require('express-rate-limit');
+
 const limiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes
     max: 5000, // Limit each IP to 5000 requests per windowMs to allow polling
